@@ -1,15 +1,20 @@
-name: Java CI
+# Simpan file ini di: .github/workflows/ci.yml
+
+name: Java CI with Maven
 
 on:
   push:
-    branches: [ "*" ]
+    branches: [ "main", "master", "develop" ] # Menambahkan branch umum lainnya
   pull_request:
     branches: [ "main", "master" ]
 
 jobs:
-  build-and-test: # Nama job yang lebih deskriptif
+  build-and-test:
+    name: Build and Test Project
     runs-on: ubuntu-latest
 
+    # Service container untuk database PostgreSQL
+    # akan tersedia untuk semua langkah di dalam job ini.
     services:
       postgres:
         image: postgres:16
@@ -19,7 +24,8 @@ jobs:
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
-        # Healthcheck ini memastikan langkah berikutnya tidak akan berjalan sampai DB siap
+        # Healthcheck ini memastikan langkah-langkah berikutnya tidak akan berjalan
+        # sampai database benar-benar siap menerima koneksi.
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -27,37 +33,35 @@ jobs:
           --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      # Langkah 1: Checkout kode dari repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Java 17 # Menggunakan versi Java LTS yang stabil
+      # Langkah 2: Setup JDK versi 17 (versi LTS yang stabil)
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17' # Atau '21'
+          java-version: '17'
           distribution: 'temurin'
           cache: maven
 
-      # Langkah ini mungkin tidak diperlukan jika Anda memiliki application-test.properties yang benar
-      # - name: Configure application-test.properties
-      #   run: |
-      #     echo "spring.datasource.url=jdbc:postgresql://localhost:5432/pbo_db_todos" >> src/test/resources/application.properties
-      #     echo "spring.datasource.username=postgres" >> src/test/resources/application.properties
-      #     echo "spring.datasource.password=postgres" >> src/test/resources/application.properties
-      
-      # Menggabungkan langkah build, tes, dan packaging
-      - name: Build, Test, and Package with Coverage
-        run: |
-          chmod +x mvnw
-          ./mvnw clean verify jacoco:check
+      # Langkah 3: Build, jalankan tes, dan periksa coverage dengan satu perintah
+      # 'verify' adalah fase Maven yang akan menjalankan 'test' dan 'package'.
+      # 'jacoco:check' akan memverifikasi aturan coverage yang Anda setel di pom.xml.
+      - name: Build, Test, and Run Coverage Check
+        run: ./mvnw clean verify jacoco:check
 
-      - name: Upload JaCoCo report
+      # Langkah 4 (Opsional): Upload laporan test coverage sebagai artifact
+      # Ini berguna untuk melihat detail coverage setelah workflow selesai.
+      - name: Upload JaCoCo test coverage report
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
           path: target/site/jacoco/
 
+      # Langkah 5 (Opsional): Upload JAR yang sudah jadi sebagai artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spring-boot-app
-          # Pastikan nama JAR sesuai dengan yang dihasilkan oleh proyek Anda
+          name: application-jar
           path: target/*.jar

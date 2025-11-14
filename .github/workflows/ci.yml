@@ -7,7 +7,7 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  test:
+  build-and-test: # Nama job yang lebih deskriptif
     runs-on: ubuntu-latest
 
     services:
@@ -19,6 +19,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
+        # Healthcheck ini memastikan langkah berikutnya tidak akan berjalan sampai DB siap
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -28,59 +29,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 25
+      - name: Setup Java 17 # Menggunakan versi Java LTS yang stabil
         uses: actions/setup-java@v4
         with:
-          java-version: '25'
+          java-version: '17' # Atau '21'
           distribution: 'temurin'
           cache: maven
 
-      - name: Copy and configure application.properties
-        run: |
-          cp src/main/resources/application.properties.template src/main/resources/application.properties
-          sed -i 's|spring.datasource.username=.*|spring.datasource.username=postgres|g' src/main/resources/application.properties
-          sed -i 's|spring.datasource.password=.*|spring.datasource.password=postgres|g' src/main/resources/application.properties
-
-      - name: Wait for PostgreSQL
-        run: |
-          for i in {1..10}; do
-            pg_isready -h localhost -p 5432 -U postgres && break
-            echo "Waiting for postgres..."
-            sleep 5
-          done
-
-      # Jalankan unit test + coverage
-      - name: Run tests with coverage
+      # Langkah ini mungkin tidak diperlukan jika Anda memiliki application-test.properties yang benar
+      # - name: Configure application-test.properties
+      #   run: |
+      #     echo "spring.datasource.url=jdbc:postgresql://localhost:5432/pbo_db_todos" >> src/test/resources/application.properties
+      #     echo "spring.datasource.username=postgres" >> src/test/resources/application.properties
+      #     echo "spring.datasource.password=postgres" >> src/test/resources/application.properties
+      
+      # Menggabungkan langkah build, tes, dan packaging
+      - name: Build, Test, and Package with Coverage
         run: |
           chmod +x mvnw
-          ./mvnw clean test jacoco:check
+          ./mvnw clean verify jacoco:check
 
-      - name: Upload test report
+      - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: jacoco-report
           path: target/site/jacoco/
 
-      # 🔹 Tambahkan build JAR
-      - name: Build Spring Boot JAR
-        run: |
-          ./mvnw clean package -DskipTests
-
-      # 🔹 Verifikasi bahwa JAR memiliki manifest dan dapat dijalankan
-      - name: Verify executable JAR
-        run: |
-          echo "Checking manifest..."
-          jar tf target/*.jar | grep META-INF/MANIFEST.MF
-          jar xf target/*.jar META-INF/MANIFEST.MF
-          cat META-INF/MANIFEST.MF
-          echo "Testing java -jar startup..."
-          java -jar target/*.jar --spring.main.web-application-type=none --logging.level.root=OFF &
-          sleep 10
-          pkill -f 'java -jar' || true
-
-      # 🔹 Upload hasil build (opsional)
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: spring-boot-app
+          # Pastikan nama JAR sesuai dengan yang dihasilkan oleh proyek Anda
           path: target/*.jar

@@ -1,127 +1,67 @@
 package org.delcom.todos.services;
 
 import org.delcom.todos.entities.CashFlow;
-import org.delcom.todos.repositories.ICashFlowRepository;
-import org.delcom.todos.types.ESource;
-import org.delcom.todos.types.EType;
+import org.delcom.todos.repositories.CashFlowRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
-public class CashFlowService implements ICashFlowService {
+public class CashFlowService {
 
-    private final ICashFlowRepository cashFlowRepository;
+    private final CashFlowRepository cashFlowRepository;
 
     @Autowired
-    public CashFlowService(ICashFlowRepository cashFlowRepository) {
+    public CashFlowService(CashFlowRepository cashFlowRepository) {
         this.cashFlowRepository = cashFlowRepository;
     }
 
-    /**
-     * Mengambil semua data. Jika ada parameter pencarian, 
-     * data akan difilter di level database.
-     */
-    @Override
-    public ArrayList<CashFlow> getAll(String search) {
+    public CashFlow createCashFlow(String type, String source, String label, Integer amount, String description) {
+        CashFlow cashFlow = new CashFlow(type, source, label, amount, description);
+        cashFlow.setId(UUID.randomUUID());
+        return cashFlowRepository.save(cashFlow);
+    }
+
+    public List<CashFlow> getAllCashFlows(String search) {
         if (search == null || search.trim().isEmpty()) {
-            return new ArrayList<>(cashFlowRepository.findAll());
+            return cashFlowRepository.findAll();
         }
-        // Menggunakan metode custom dari repository untuk pencarian yang efisien
-        return new ArrayList<>(cashFlowRepository.findByLabelContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search));
+        return cashFlowRepository.findByKeyword(search);
     }
 
-    /**
-     * Mengambil satu data berdasarkan ID.
-     */
-    @Override
-    public Optional<CashFlow> getById(String id) {
-        return cashFlowRepository.findById(id);
-    }
-
-    /**
-     * Menambahkan data baru. ID akan digenerate di sini.
-     */
-    @Override
-    public CashFlow addCashFlow(String type, String source, String label, String description, long amount) {
-        EType t = EType.fromString(type);
-        ESource s = ESource.fromString(source);
-        if (t == null || s == null) {
-            return null; // Validasi gagal
-        }
-        
-        // Buat ID baru di sini sebelum membuat entity
-        String newId = UUID.randomUUID().toString();
-        
-        CashFlow cf = new CashFlow(newId, t, s, label, description, amount);
-        
-        // Menggunakan metode .save() dari JpaRepository untuk menyimpan ke database
-        return cashFlowRepository.save(cf);
-    }
-
-    /**
-     * Memperbarui data yang sudah ada berdasarkan ID.
-     */
-    @Override
-    public boolean updateCashFlow(String id, String type, String source, String label, String description, long amount) {
-        // 1. Validasi input type dan source
-        EType t = EType.fromString(type);
-        ESource s = ESource.fromString(source);
-        if (t == null || s == null) {
-            return false;
-        }
-
-        // 2. Cari data yang ada di database
-        Optional<CashFlow> optionalCashFlow = cashFlowRepository.findById(id);
-
-        // 3. Jika data tidak ditemukan, kembalikan false
-        if (optionalCashFlow.isEmpty()) {
-            return false;
-        }
-
-        // 4. Jika data ditemukan, perbarui field-nya
-        CashFlow existingCashFlow = optionalCashFlow.get();
-        existingCashFlow.setType(t);
-        existingCashFlow.setSource(s);
-        existingCashFlow.setLabel(label);
-        existingCashFlow.setDescription(description);
-        existingCashFlow.setAmount(amount);
-        existingCashFlow.setUpdatedAt(Instant.now()); // Jangan lupa perbarui timestamp
-
-        // 5. Simpan kembali perubahan ke database.
-        // JpaRepository cukup pintar untuk melakukan UPDATE jika ID sudah ada.
-        cashFlowRepository.save(existingCashFlow);
-        
-        return true;
+    public CashFlow getCashFlowById(UUID id) {
+        return cashFlowRepository.findById(id).orElse(null);
     }
     
-    /**
-     * Menghapus data berdasarkan ID.
-     */
-    @Override
-    public boolean removeCashFlow(String id) {
-        // Cek dulu apakah datanya ada untuk menghindari error
+    public List<String> getCashFlowLabels() {
+        return cashFlowRepository.findDistinctLabels();
+    }
+
+    public CashFlow updateCashFlow(UUID id, String type, String source, String label, Integer amount, String description) {
+        CashFlow existing = getCashFlowById(id);
+        if (existing == null) {
+            return null;
+        }
+
+        // --- PERBAIKAN DI SINI ---
+        // Panggil setter langsung dengan String, karena konversi sudah ditangani di dalam entitas.
+        existing.setType(type);
+        existing.setSource(source);
+        existing.setLabel(label);
+        // Panggil setter langsung dengan Integer.
+        existing.setAmount(amount);
+        existing.setDescription(description);
+        
+        return cashFlowRepository.save(existing);
+    }
+
+    public boolean deleteCashFlow(UUID id) {
         if (cashFlowRepository.existsById(id)) {
             cashFlowRepository.deleteById(id);
             return true;
         }
         return false;
-    }
-
-    /**
-     * Mengambil semua label unik dari database.
-     */
-    @Override
-    public Set<String> getAllLabels() {
-        // Logika ini tetap sama, hanya sumber datanya yang berbeda (langsung dari DB)
-        return cashFlowRepository.findAll().stream()
-                .map(CashFlow::getLabel)
-                .collect(Collectors.toSet());
     }
 }

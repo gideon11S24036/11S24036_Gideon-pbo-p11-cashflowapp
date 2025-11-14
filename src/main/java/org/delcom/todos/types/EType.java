@@ -1,22 +1,19 @@
 package org.delcom.todos.types;
 
 public enum EType {
-	INFLOW("Inflow"), OUTFLOW("Outflow");
+    PEMASUKAN,
+    PENGELUARAN;
 
-	private String value;
-
-	EType(String value) {
-		this.value = value;
-	}
-
-	public String getValue() {
-		return value;
-	}
-
-	public static EType fromString(String v) {
-		for (EType t : EType.values()) {
-			if (t.name().equalsIgnoreCase(v) || t.value.equalsIgnoreCase(v)) return t;
-		}
-		return null;
-	}
+    public static EType fromString(String text) {
+        if (text == null) {
+            return null;
+        }
+        // Membersihkan spasi di awal/akhir dan membandingkan tanpa case
+        for (EType e : EType.values()) {
+            if (e.name().equalsIgnoreCase(text.trim())) {
+                return e;
+            }
+        }
+        return null;
+    }
 }

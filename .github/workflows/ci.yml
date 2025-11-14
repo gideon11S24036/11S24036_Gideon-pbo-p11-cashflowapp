@@ -13,8 +13,6 @@ jobs:
     name: Build and Test Project
     runs-on: ubuntu-latest
 
-    # Service container untuk database PostgreSQL
-    # akan tersedia untuk semua langkah di dalam job ini.
     services:
       postgres:
         image: postgres:16
@@ -24,8 +22,6 @@ jobs:
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
-        # Healthcheck ini memastikan langkah-langkah berikutnya tidak akan berjalan
-        # sampai database benar-benar siap menerima koneksi.
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -33,11 +29,9 @@ jobs:
           --health-retries=5
 
     steps:
-      # Langkah 1: Checkout kode dari repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Langkah 2: Setup JDK versi 17 (versi LTS yang stabil)
       - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
@@ -45,21 +39,19 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Langkah 3: Build, jalankan tes, dan periksa coverage dengan satu perintah
-      # 'verify' adalah fase Maven yang akan menjalankan 'test' dan 'package'.
-      # 'jacoco:check' akan memverifikasi aturan coverage yang Anda setel di pom.xml.
+      # --- Langkah Tambahan untuk Memperbaiki Eror Permission Denied ---
+      - name: Grant execute permission for mvnw
+        run: chmod +x ./mvnw
+
       - name: Build, Test, and Run Coverage Check
         run: ./mvnw clean verify jacoco:check
 
-      # Langkah 4 (Opsional): Upload laporan test coverage sebagai artifact
-      # Ini berguna untuk melihat detail coverage setelah workflow selesai.
       - name: Upload JaCoCo test coverage report
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
           path: target/site/jacoco/
 
-      # Langkah 5 (Opsional): Upload JAR yang sudah jadi sebagai artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
